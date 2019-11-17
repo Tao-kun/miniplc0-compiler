@@ -144,8 +144,8 @@ namespace miniplc0 {
                 if (!next.has_value() || next.value().GetType() != TokenType::SEMICOLON)
                     return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrNoSemicolon);
 
+                addVariable(token);
                 // 表达式的结果存于栈顶，addVariable即可、不需要STO
-                //addVariable(token);
                 //auto index = getIndex(token.GetValueString());
                 //_instructions.emplace_back(Operation::STO, index);
                 continue;
@@ -153,6 +153,8 @@ namespace miniplc0 {
                 // ';'
                 // 没有赋值，声明但不初始化
                 addUninitializedVariable(token);
+                // 为未初始化变量预留栈内存
+                _instructions.emplace_back(Operation::LIT,0);
                 continue;
             } else {
                 // 既没有等号也没有分号，错误
@@ -299,12 +301,12 @@ namespace miniplc0 {
         if (err.has_value())
             return err;
 
-        // 此时右侧表达式的结果存在于栈顶，不需要STO
-        //if (isConstant(variable.GetValueString()))
-        //    return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrAssignToConstant);
-        //auto index = getIndex(variable.GetValueString());
-        //if (isUninitializedVariable(variable.GetValueString()) || isDeclared(variable.GetValueString()))
-        //    _instructions.emplace_back(Operation::STO, index);
+        if (isConstant(variable.GetValueString()))
+            return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrAssignToConstant);
+        // 此时右侧表达式的结果存在于栈顶，将栈顶存回用STO
+        auto index = getIndex(variable.GetValueString());
+        if (isDeclared(variable.GetValueString()) || isUninitializedVariable(variable.GetValueString()))
+            _instructions.emplace_back(Operation::STO, index);
 
         // ';'
         next = nextToken();
