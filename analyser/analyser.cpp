@@ -1,6 +1,7 @@
 #include "analyser.h"
 
 #include <climits>
+#include <regex>
 
 namespace miniplc0 {
     std::pair<std::vector<Instruction>, std::optional<CompilationError>> Analyser::Analyse() {
@@ -125,7 +126,6 @@ namespace miniplc0 {
                 return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrDuplicateDeclaration);
             Token token = next.value();
 
-
             // 变量可能没有初始化，仍然需要一次预读
             next = nextToken();
             if (!next.has_value())
@@ -154,7 +154,7 @@ namespace miniplc0 {
                 // 没有赋值，声明但不初始化
                 addUninitializedVariable(token);
                 // 为未初始化变量预留栈内存
-                _instructions.emplace_back(Operation::LIT,0);
+                _instructions.emplace_back(Operation::LIT, 0);
                 continue;
             } else {
                 // 既没有等号也没有分号，错误
@@ -223,6 +223,7 @@ namespace miniplc0 {
             return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrEOF);
         Token token = next.value();
         if (token.GetType() == TokenType::UNSIGNED_INTEGER) {
+            // TODO: 溢出
             try {
                 out = std::any_cast<int32_t>(token.GetValue());
             }
@@ -236,6 +237,8 @@ namespace miniplc0 {
                 return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrEOF);
             if (next.value().GetType() != UNSIGNED_INTEGER)
                 return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrInvalidAssignment);
+
+            // TODO: 溢出
             try {
                 out = std::any_cast<int32_t>(token.GetValue());
             }
@@ -307,6 +310,10 @@ namespace miniplc0 {
         auto index = getIndex(variable.GetValueString());
         if (isDeclared(variable.GetValueString()) || isUninitializedVariable(variable.GetValueString()))
             _instructions.emplace_back(Operation::STO, index);
+
+        // 将此变量从_uninitialized_vars移入_vars
+        _uninitialized_vars.erase(variable.GetValueString());
+        addVariable(variable);
 
         // ';'
         next = nextToken();
@@ -410,6 +417,9 @@ namespace miniplc0 {
             case TokenType::IDENTIFIER: {
                 if (!isDeclared(next.value().GetValueString()))
                     return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrNotDeclared);
+                // 使用未初始化的变量、报错
+                if (isUninitializedVariable(next.value().GetValueString()))
+                    return std::make_optional<CompilationError>(_current_pos, ErrorCode::ErrNotInitialized);
                 auto index = getIndex(next.value().GetValueString());
                 _instructions.emplace_back(Operation::LOD, index);
                 break;
@@ -417,6 +427,7 @@ namespace miniplc0 {
             case TokenType::UNSIGNED_INTEGER: {
                 Token token = next.value();
                 int out = 0;
+                // TODO: 溢出
                 try {
                     out = std::any_cast<int32_t>(token.GetValue());
                 }

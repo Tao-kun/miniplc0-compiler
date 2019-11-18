@@ -1,8 +1,10 @@
 #include "tokenizer/tokenizer.h"
 
 #include <cctype>
+#include <cstdint>
 #include <sstream>
 #include <map>
+#include <regex>
 
 namespace miniplc0 {
 
@@ -75,6 +77,8 @@ namespace miniplc0 {
             // 2. 只有在可能会转移的状态读入一个 char
             // 因为我们实现了 unread，为了省事我们选择第一种
             auto current_char = nextChar();
+            // [a-zA-Z][0-9a-zA-Z]*
+            static std::regex identifierRegex("[a-zA-Z][0-9a-zA-Z]*", std::regex::extended);
             // 针对当前的状态进行不同的操作
             switch (current_state) {
 
@@ -169,9 +173,9 @@ namespace miniplc0 {
                     //     解析成功则返回无符号整数类型的token，否则返回编译错误
                     auto return_current_token = [&]() {
                         // LAMBDA FUNCTION: CONVERT STRINGSTREAM TO TOKEN (INTEGER)
-                        int32_t uint_value;
-                        ss >> uint_value;
-                        if (ss.fail()) {
+                        int32_t int_value;
+                        ss >> int_value;
+                        if (ss.fail() || int_value > INT32_MAX) {
                             return std::make_pair(
                                     std::optional<Token>(),
                                     std::make_optional<CompilationError>(pos, ErrorCode::ErrIntegerOverflow));
@@ -179,7 +183,7 @@ namespace miniplc0 {
                             return std::make_pair(
                                     std::make_optional<Token>(
                                             TokenType::UNSIGNED_INTEGER,
-                                            uint_value,
+                                            int_value,
                                             pos,
                                             currentPos()),
                                     std::optional<CompilationError>());
@@ -224,6 +228,13 @@ namespace miniplc0 {
                                     std::make_optional<CompilationError>(pos, ErrorCode::ErrStreamError));
                         } else {
                             const auto &it = keyword_map.find(ident_val);
+
+                            if (!std::regex_match(ident_val, identifierRegex))
+                                return std::make_pair(
+                                        std::optional<Token>(),
+                                        std::make_optional<CompilationError>(pos, ErrorCode::ErrInvalidIdentifier)
+                                );
+
                             return std::make_pair(
                                     std::make_optional<Token>(
                                             it == keyword_map.end() ? TokenType::IDENTIFIER : it->second,
