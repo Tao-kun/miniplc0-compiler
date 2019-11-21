@@ -7,14 +7,6 @@
 
 // 下面是示例如何书写测试用例
 TEST_CASE("Test hello world.") {
-    /*
-     std::string input =
-            "begin\n"
-            "	var a = 1;\n"
-            "	const b = 1\n"
-            "	print(a+b);\n"
-            "end\n";
-            */
     std::string input =
             "begin\n"
             "var a=1+2;\n"
@@ -40,8 +32,6 @@ TEST_CASE("Test hello world.") {
             miniplc0::Token(miniplc0::TokenType::END, std::string("end"), 3, 0, 3, 3)
     };
     auto result = tkz.AllTokens();
-    if (result.second.has_value()) {
-        FAIL();
-    }
+    REQUIRE_FALSE(result.second.has_value());
     REQUIRE((result.first == output));
 }
