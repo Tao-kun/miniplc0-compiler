@@ -312,8 +312,11 @@ namespace miniplc0 {
             _instructions.emplace_back(Operation::STO, index);
 
         // 将此变量从_uninitialized_vars移入_vars
-        _uninitialized_vars.erase(variable.GetValueString());
-        addVariable(variable);
+        if (isUninitializedVariable(variable.GetValueString())) {
+            auto it = _uninitialized_vars.find(variable.GetValueString());
+            _vars.insert({it->first, it->second});
+            _uninitialized_vars.erase(variable.GetValueString());
+        }
 
         // ';'
         next = nextToken();
